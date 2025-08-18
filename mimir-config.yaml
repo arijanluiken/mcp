@@ -1,0 +1,41 @@
+multitenancy_enabled: false
+
+server:
+  http_listen_port: 9009
+
+memberlist:
+  join_members:
+    - mimir
+
+distributor:
+  ring:
+    kvstore:
+      store: memberlist
+
+ingester:
+  ring:
+    kvstore:
+      store: memberlist
+
+ruler:
+  ring:
+    kvstore:
+      store: memberlist
+
+compactor: {}
+
+blocks_storage:
+  backend: filesystem
+  filesystem:
+    dir: /data/blocks
+  bucket_store:
+    sync_dir: /data/tsdb-sync
+
+api:
+  prometheus_http_prefix: /prometheus
+
+limits:
+  ingestion_tenant_shard_size: 1
+  max_global_series_per_user: 0
+  max_global_series_per_metric: 0
+  max_global_exemplars_per_user: 0

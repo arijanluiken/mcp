@@ -1,0 +1,9 @@
+{
+	"servers": {
+		"servicegraph": {
+			"url": "http://localhost:9020/rpc",
+			"type": "http"
+		}
+	},
+	"inputs": []
+}

@@ -1,0 +1,40 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 15
+  batch: {}
+
+exporters:
+  debug:
+    verbosity: normal
+  prometheusremotewrite:
+    endpoint: http://mimir:9009/api/v1/push
+
+connectors:
+  spanmetrics:
+    dimensions:
+      - name: peer.service
+    histogram:
+      explicit:
+        buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10]
+  servicegraph: {}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [spanmetrics, servicegraph, debug]
+    metrics:
+      receivers: [spanmetrics, servicegraph]
+      processors: [batch]
+      exporters: [prometheusremotewrite]

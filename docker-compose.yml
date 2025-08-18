@@ -1,0 +1,130 @@
+version: '3.8'
+
+services:
+  mimir:
+    image: grafana/mimir:latest
+    container_name: mimir
+    ports:
+      - "9009:9009" # HTTP API
+      - "7946:7946" # Gossip
+    command: [
+      "-config.file=/etc/mimir/mimir.yaml",
+      "-ingester.ring.replication-factor=1"
+    ]
+    volumes:
+      - ./mimir-config.yaml:/etc/mimir/mimir.yaml
+      - mimir-data:/data
+    networks:
+      - monitoring
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      - mimir
+    networks:
+      - monitoring
+
+  mcp:
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile
+    container_name: mcp
+    environment:
+      - MIMIR_URL=http://mimir:9009/prometheus
+      - MCP_LISTEN_ADDR=:9020
+    ports:
+      - "9020:9020"
+    depends_on:
+      - mimir
+    networks:
+      - monitoring
+
+  service-a:
+    build:
+      context: ./testapp
+      dockerfile: service-a/Dockerfile
+    container_name: service-a
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - SERVICE_B_URL=http://service-b:8081/hello
+      - SERVICE_A_RATE=12s
+    ports:
+      - "8080:8080"
+    depends_on:
+      - otel-collector
+      - service-b
+    networks:
+      - monitoring
+
+  service-b:
+    build:
+      context: ./testapp
+      dockerfile: service-b/Dockerfile
+    container_name: service-b
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - SERVICE_B_RATE=12s
+      - SERVICE_C_URL=http://service-c:8082/work
+    ports:
+      - "8081:8081"
+    depends_on:
+      - otel-collector
+    networks:
+      - monitoring
+
+  service-c:
+    build:
+      context: ./testapp
+      dockerfile: service-c/Dockerfile
+    container_name: service-c
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - SERVICE_C_RATE=20s
+      - SERVICE_D_URL=http://service-d:8083/do
+    ports:
+      - "8082:8082"
+    depends_on:
+      - otel-collector
+      - service-d
+    networks:
+      - monitoring
+
+  service-d:
+    build:
+      context: ./testapp
+      dockerfile: service-d/Dockerfile
+    container_name: service-d
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+    ports:
+      - "8083:8083"
+    depends_on:
+      - otel-collector
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge
+
+volumes:
+  mimir-data: {}
