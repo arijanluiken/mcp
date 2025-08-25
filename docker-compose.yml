@@ -58,6 +58,25 @@ services:
     networks:
       - monitoring
 
+  if-service:
+    build:
+      context: ./if
+      dockerfile: Dockerfile
+    container_name: if-service
+    environment:
+      - MIMIR_URL=http://mimir:9009/prometheus
+      - IF_LISTEN_ADDR=:9030
+      # target selection (defaults shown)
+      - TARGET_SERVER=service-d
+      - TARGET_CLIENT=
+      - WINDOW_MINUTES=30
+    ports:
+      - "9030:9030"
+    depends_on:
+      - mimir
+    networks:
+      - monitoring
+
   service-a:
     build:
       context: ./testapp
